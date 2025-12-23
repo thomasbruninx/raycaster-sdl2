@@ -16,4 +16,4 @@ make all
 ./raycaster
 ```
 
-Controls: `W/S` or `Up/Down` to move, `A/D` or arrow keys to turn, `Esc` to exit.
+Controls: `W/S` or `Up/Down` to move, `A/D` or arrow keys to turn, `Space` for action, `Esc` to exit.

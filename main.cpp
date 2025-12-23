@@ -1,8 +1,11 @@
 #include <SDL2/SDL.h>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <iostream>
 #include <vector>
+
+constexpr int DOOR_TILE = 5;
 
 struct Color {
     Uint8 r, g, b;
@@ -19,6 +22,18 @@ struct Map {
         }
         return tiles[y * width + x];
     }
+};
+
+struct Door {
+    int x;
+    int y;
+    bool vertical;          // true when the door faces east/west (slides along X)
+    double openAmount = 0;  // 0 closed, 1 fully open
+    bool targetOpen = false;
+    double timeFullyOpen = 0.0;
+
+    Door (int x_, int y_,  bool vertical_)
+        : x(x_), y(y_), vertical(vertical_) {}
 };
 
 struct Player {
@@ -84,7 +99,7 @@ Map createDemoMap() {
     const int h = 16;
     const std::array<int, w * h> data = {{
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 1,
         1, 0, 2, 2, 0, 0, 0, 0, 0, 3, 3, 0, 0, 4, 0, 1,
         1, 0, 2, 0, 0, 1, 0, 1, 0, 3, 0, 0, 4, 0, 0, 1,
         1, 0, 2, 0, 0, 1, 0, 1, 0, 3, 0, 0, 4, 0, 0, 1,
@@ -93,7 +108,7 @@ Map createDemoMap() {
         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 1,
         1, 0, 2, 2, 0, 0, 0, 0, 0, 3, 3, 0, 0, 4, 0, 1,
         1, 0, 2, 0, 0, 1, 0, 1, 0, 3, 0, 0, 4, 0, 0, 1,
-        1, 0, 2, 0, 0, 1, 0, 1, 0, 3, 0, 0, 4, 0, 0, 1,
+        1, 5, 2, 0, 0, 1, 0, 1, 0, 3, 0, 0, 4, 0, 0, 1,
         1, 0, 2, 0, 0, 1, 0, 1, 0, 3, 0, 0, 4, 4, 0, 1,
         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 1,
         1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 1,
@@ -105,16 +120,70 @@ Map createDemoMap() {
     m.width = w;
     m.height = h;
     m.tiles.assign(data.begin(), data.end());
+    // Inject a door between two walls (above/below) near the center.
+    int doorX = 8;
+    int doorY = 8;
+    m.tiles[doorY * w + doorX] = DOOR_TILE;
+    m.tiles[(doorY - 1) * w + doorX] = 1;
+    m.tiles[(doorY + 1) * w + doorX] = 1;
+    m.tiles[doorY * w + (doorX - 1)] = 0;
+    m.tiles[doorY * w + (doorX + 1)] = 0;
     return m;
 }
 
+Door makeDoor(int x, int y, const Map& map) {
+    bool vertical = false;
+    bool wallsLeftRight = map.at(x - 1, y) > 0 && map.at(x + 1, y) > 0;
+    bool wallsUpDown = map.at(x, y - 1) > 0 && map.at(x, y + 1) > 0;
+    // Swap orientation to rotate rendering 90 degrees but keep existing hit logic.
+    if (wallsUpDown && !wallsLeftRight) {
+        vertical = true;
+    } else if (!wallsUpDown && wallsLeftRight) {
+        vertical = false;
+    } else {
+        vertical = wallsUpDown;
+    }
+    return Door{x, y, vertical};
+}
+
+std::vector<Door> extractDoors(const Map& map) {
+    std::vector<Door> doors;
+    for (int y = 0; y < map.height; ++y) {
+        for (int x = 0; x < map.width; ++x) {
+            if (map.tiles[y * map.width + x] == DOOR_TILE) {
+                doors.push_back(makeDoor(x, y, map));
+            }
+        }
+    }
+    return doors;
+}
+
+Door* findDoor(std::vector<Door>& doors, int x, int y) {
+    for (auto& d : doors) {
+        if (d.x == x && d.y == y) {
+            return &d;
+        }
+    }
+    return nullptr;
+}
+
+const Door* findDoor(const std::vector<Door>& doors, int x, int y) {
+    for (const auto& d : doors) {
+        if (d.x == x && d.y == y) {
+            return &d;
+        }
+    }
+    return nullptr;
+}
+
 Color wallColor(int id, bool isSideHit) {
-    static const std::array<Color, 5> palette = {{
+    static const std::array<Color, 6> palette = {{
         {0, 0, 0},       // unused
         {200, 60, 60},   // red
         {60, 160, 200},  // blue
         {60, 200, 120},  // green
         {220, 200, 80},  // yellow
+        {160, 160, 180}, // door color fallback
     }};
     Color c = palette[std::min(id, static_cast<int>(palette.size() - 1))];
     if (isSideHit) {
@@ -125,7 +194,63 @@ Color wallColor(int id, bool isSideHit) {
     return c;
 }
 
-void renderFrame(const Map& map, const Player& player, const Config& cfg, SDL_Renderer* renderer) {
+Color doorRenderColor(const Door& door, bool isSideHit) {
+    Color base{150, 170, 190};
+    double visibility = 1.0 - door.openAmount * 0.7; // fade as it opens
+    base.r = static_cast<Uint8>(base.r * visibility);
+    base.g = static_cast<Uint8>(base.g * visibility);
+    base.b = static_cast<Uint8>(base.b * visibility);
+    if (isSideHit) {
+        base.r = static_cast<Uint8>(base.r * 0.8);
+        base.g = static_cast<Uint8>(base.g * 0.8);
+        base.b = static_cast<Uint8>(base.b * 0.8);
+    }
+    return base;
+}
+
+bool computeDoorHit(const Door& door, const Player& player, double rayDirX, double rayDirY, double& dist, bool& side) {
+    const double minDist = 0.0001;
+    if (door.vertical) {
+        // Corridor runs left/right (walls above/below). Door plane stays at x=const and slides into a wall along Y.
+        if (std::abs(rayDirX) < 1e-6) {
+            return false;
+        }
+        double planeX = door.x + 0.5;
+        double t = (planeX - player.x) / rayDirX;
+        if (t <= minDist) {
+            return false;
+        }
+        double yHit = player.y + t * rayDirY;
+        double minY = door.y + door.openAmount; // slides down as it opens (into bottom wall)
+        double maxY = door.y + 1.0;
+        if (yHit >= minY && yHit <= maxY) {
+            dist = t;
+            side = false; // east/west face
+            return true;
+        }
+    } else {
+        // Corridor runs up/down (walls left/right). Door plane stays at y=const and slides into a wall along X.
+        if (std::abs(rayDirY) < 1e-6) {
+            return false;
+        }
+        double planeY = door.y + 0.5;
+        double t = (planeY - player.y) / rayDirY;
+        if (t <= minDist) {
+            return false;
+        }
+        double xHit = player.x + t * rayDirX;
+        double minX = door.x + door.openAmount; // slides right as it opens (into right wall)
+        double maxX = door.x + 1.0;
+        if (xHit >= minX && xHit <= maxX) {
+            dist = t;
+            side = true; // north/south face
+            return true;
+        }
+    }
+    return false;
+}
+
+void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
@@ -177,6 +302,8 @@ void renderFrame(const Map& map, const Player& player, const Config& cfg, SDL_Re
         bool hit = false;
         bool side = false;
         int wallId = 0;
+        double doorHitDist = -1.0;
+        const Door* hitDoor = nullptr;
         while (!hit) {
             if (sideDistX < sideDistY) {
                 sideDistX += deltaDistX;
@@ -187,13 +314,34 @@ void renderFrame(const Map& map, const Player& player, const Config& cfg, SDL_Re
                 mapY += stepY;
                 side = true;
             }
-            wallId = map.at(mapX, mapY);
-            if (wallId > 0) {
+
+            int tile = map.at(mapX, mapY);
+            if (tile == DOOR_TILE) {
+                const Door* door = findDoor(doors, mapX, mapY);
+                if (door && door->openAmount < 0.99) {
+                    double dist;
+                    bool doorSide;
+                    if (computeDoorHit(*door, player, rayDirX, rayDirY, dist, doorSide)) {
+                        hit = true;
+                        wallId = DOOR_TILE;
+                        doorHitDist = dist;
+                        side = doorSide;
+                        hitDoor = door;
+                    }
+                }
+                if (!hit) {
+                    continue; // fully open or no intersection; keep marching
+                }
+            }
+
+            if (tile > 0 && tile != DOOR_TILE) {
                 hit = true;
+                wallId = tile;
             }
         }
 
-        double perpWallDist = side ? (sideDistY - deltaDistY) : (sideDistX - deltaDistX);
+        double perpWallDist = (doorHitDist > 0.0) ? doorHitDist
+                                                 : (side ? (sideDistY - deltaDistY) : (sideDistX - deltaDistX));
         if (perpWallDist <= 0.0001) {
             perpWallDist = 0.0001;
         }
@@ -201,7 +349,7 @@ void renderFrame(const Map& map, const Player& player, const Config& cfg, SDL_Re
         int drawStart = -lineHeight / 2 + cfg.screenHeight / 2;
         int drawEnd = lineHeight / 2 + cfg.screenHeight / 2;
 
-        Color c = wallColor(wallId, side);
+        Color c = hitDoor ? doorRenderColor(*hitDoor, side) : wallColor(wallId, side);
         SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
         SDL_RenderDrawLine(renderer, x, drawStart, x, drawEnd);
     }
@@ -209,27 +357,46 @@ void renderFrame(const Map& map, const Player& player, const Config& cfg, SDL_Re
     SDL_RenderPresent(renderer);
 }
 
-void handleInput(const Uint8* keystate, const Map& map, Player& player, const Config& cfg, double dt) {
+bool playerInDoorway(const Door& door, const Player& player) {
+    return player.x >= door.x && player.x <= door.x + 1.0 &&
+           player.y >= door.y && player.y <= door.y + 1.0;
+}
+
+bool isWalkable(double x, double y, const Map& map, const std::vector<Door>& doors) {
+    int cellX = static_cast<int>(x);
+    int cellY = static_cast<int>(y);
+    int tile = map.at(cellX, cellY);
+    if (tile == 0) {
+        return true;
+    }
+    if (tile == DOOR_TILE) {
+        const Door* door = findDoor(doors, cellX, cellY);
+        return door && door->openAmount > 0.8;
+    }
+    return false;
+}
+
+void handleInput(const Uint8* keystate, const Map& map, const std::vector<Door>& doors, Player& player, const Config& cfg, double dt) {
     double moveStep = cfg.moveSpeed * dt;
     double rotStep = cfg.rotSpeed * dt;
 
     if (keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_UP]) {
         double nextX = player.x + player.dirX * moveStep;
         double nextY = player.y + player.dirY * moveStep;
-        if (map.at(static_cast<int>(nextX), static_cast<int>(player.y)) == 0) {
+        if (isWalkable(nextX, player.y, map, doors)) {
             player.x = nextX;
         }
-        if (map.at(static_cast<int>(player.x), static_cast<int>(nextY)) == 0) {
+        if (isWalkable(player.x, nextY, map, doors)) {
             player.y = nextY;
         }
     }
     if (keystate[SDL_SCANCODE_S] || keystate[SDL_SCANCODE_DOWN]) {
         double nextX = player.x - player.dirX * moveStep;
         double nextY = player.y - player.dirY * moveStep;
-        if (map.at(static_cast<int>(nextX), static_cast<int>(player.y)) == 0) {
+        if (isWalkable(nextX, player.y, map, doors)) {
             player.x = nextX;
         }
-        if (map.at(static_cast<int>(player.x), static_cast<int>(nextY)) == 0) {
+        if (isWalkable(player.x, nextY, map, doors)) {
             player.y = nextY;
         }
     }
@@ -251,6 +418,44 @@ void handleInput(const Uint8* keystate, const Map& map, Player& player, const Co
     }
 }
 
+Door* doorInFront(Player& player, const Map& map, std::vector<Door>& doors) {
+    double probeDist = 1.2;
+    double targetX = player.x + player.dirX * probeDist;
+    double targetY = player.y + player.dirY * probeDist;
+    int cellX = static_cast<int>(targetX);
+    int cellY = static_cast<int>(targetY);
+    if (map.at(cellX, cellY) == DOOR_TILE) {
+        return findDoor(doors, cellX, cellY);
+    }
+    return nullptr;
+}
+
+void updateDoors(std::vector<Door>& doors, const Player& player, double dt) {
+    const double openSpeed = 1.2; // fraction per second
+    const double autoCloseDelay = 5.0;
+
+    for (auto& door : doors) {
+        bool playerBlocking = playerInDoorway(door, player);
+        if (playerBlocking) {
+            door.targetOpen = true;
+            door.timeFullyOpen = 0.0;
+        }
+
+        if (door.targetOpen) {
+            door.openAmount = std::min(1.0, door.openAmount + openSpeed * dt);
+            if (door.openAmount >= 1.0) {
+                door.timeFullyOpen += dt;
+                if (!playerBlocking && door.timeFullyOpen >= autoCloseDelay) {
+                    door.targetOpen = false;
+                }
+            }
+        } else {
+            door.timeFullyOpen = 0.0;
+            door.openAmount = std::max(0.0, door.openAmount - openSpeed * dt);
+        }
+    }
+}
+
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
@@ -263,7 +468,8 @@ int main(int argc, char* argv[]) {
     }
 
     Map map = createDemoMap();
-    Player player{8.0, 8.0, -1.0, 0.0, 0.0, 0.66};
+    std::vector<Door> doors = extractDoors(map);
+    Player player{4.5, 4.5, -1.0, 0.0, 0.0, 0.66};
 
     bool running = true;
     Uint32 lastTicks = SDL_GetTicks();
@@ -274,6 +480,11 @@ int main(int argc, char* argv[]) {
                 running = false;
             } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                 running = false;
+            } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_SPACE) {
+                Door* target = doorInFront(player, map, doors);
+                if (target) {
+                    target->targetOpen = !target->targetOpen;
+                }
             }
         }
 
@@ -282,9 +493,10 @@ int main(int argc, char* argv[]) {
         lastTicks = currentTicks;
 
         const Uint8* keystate = SDL_GetKeyboardState(nullptr);
-        handleInput(keystate, map, player, cfg, dt);
+        handleInput(keystate, map, doors, player, cfg, dt);
+        updateDoors(doors, player, dt);
 
-        renderFrame(map, player, cfg, ctx.renderer);
+        renderFrame(map, doors, player, cfg, ctx.renderer);
     }
 
     shutdownSDL(ctx);
