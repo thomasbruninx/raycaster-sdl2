@@ -1,4 +1,5 @@
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -27,7 +28,7 @@ struct Map {
 struct Door {
     int x;
     int y;
-    bool vertical;          // true when the door faces east/west (slides along X)
+    bool vertical;          // true when corridor runs left/right
     double openAmount = 0;  // 0 closed, 1 fully open
     bool targetOpen = false;
     double timeFullyOpen = 0.0;
@@ -58,9 +59,19 @@ struct SDLContext {
     SDL_Renderer* renderer = nullptr;
 };
 
+struct TextureManager {
+    std::vector<SDL_Surface*> textures; // index by tile id
+};
+
 bool initSDL(SDLContext& ctx, const Config& cfg) {
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << "\n";
+        return false;
+    }
+
+    int imgFlags = IMG_INIT_PNG;
+    if ((IMG_Init(imgFlags) & imgFlags) != imgFlags) {
+        std::cerr << "IMG_Init Error: " << IMG_GetError() << "\n";
         return false;
     }
 
@@ -90,11 +101,12 @@ void shutdownSDL(SDLContext& ctx) {
     if (ctx.window) {
         SDL_DestroyWindow(ctx.window);
     }
+    IMG_Quit();
     SDL_Quit();
 }
 
 Map createDemoMap() {
-    // Simple level with rooms and corridors; 1..4 used to color walls
+    // Simple level with rooms and corridors; 1..4 used to color walls, 5 = door
     const int w = 16;
     const int h = 16;
     const std::array<int, w * h> data = {{
@@ -250,7 +262,55 @@ bool computeDoorHit(const Door& door, const Player& player, double rayDirX, doub
     return false;
 }
 
-void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer) {
+SDL_Surface* loadSurface(const std::string& path) {
+    SDL_Surface* loaded = IMG_Load(path.c_str());
+    if (!loaded) {
+        std::cerr << "Failed to load texture " << path << ": " << IMG_GetError() << "\n";
+        return nullptr;
+    }
+    SDL_Surface* converted = SDL_ConvertSurfaceFormat(loaded, SDL_PIXELFORMAT_ARGB8888, 0);
+    SDL_FreeSurface(loaded);
+    if (!converted) {
+        std::cerr << "Failed to convert texture " << path << ": " << SDL_GetError() << "\n";
+    }
+    return converted;
+}
+
+TextureManager loadTextures() {
+    TextureManager tm{};
+    tm.textures.resize(6, nullptr);
+    tm.textures[1] = loadSurface("resources/textures/redbrick.png");
+    tm.textures[2] = loadSurface("resources/textures/greystone.png");
+    tm.textures[3] = loadSurface("resources/textures/wood.png");
+    tm.textures[4] = loadSurface("resources/textures/bluestone.png");
+    tm.textures[DOOR_TILE] = loadSurface("resources/textures/eagle.png");
+    return tm;
+}
+
+void freeTextures(TextureManager& tm) {
+    for (auto* surf : tm.textures) {
+        if (surf) {
+            SDL_FreeSurface(surf);
+        }
+    }
+    tm.textures.clear();
+}
+
+Color sampleTexture(SDL_Surface* surf, int x, int y) {
+    if (!surf) {
+        return {255, 0, 255}; // magenta fallback
+    }
+    x = std::max(0, std::min(x, surf->w - 1));
+    y = std::max(0, std::min(y, surf->h - 1));
+    Uint8* pixelBase = static_cast<Uint8*>(surf->pixels);
+    Uint32* pixels = reinterpret_cast<Uint32*>(pixelBase);
+    Uint32 pixel = pixels[y * surf->w + x];
+    Uint8 r, g, b, a;
+    SDL_GetRGBA(pixel, surf->format, &r, &g, &b, &a);
+    return {r, g, b};
+}
+
+void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
@@ -349,9 +409,40 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
         int drawStart = -lineHeight / 2 + cfg.screenHeight / 2;
         int drawEnd = lineHeight / 2 + cfg.screenHeight / 2;
 
-        Color c = hitDoor ? doorRenderColor(*hitDoor, side) : wallColor(wallId, side);
-        SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
-        SDL_RenderDrawLine(renderer, x, drawStart, x, drawEnd);
+        double hitX = player.x + perpWallDist * rayDirX;
+        double hitY = player.y + perpWallDist * rayDirY;
+        double wallX = side ? hitX : hitY;
+        wallX -= std::floor(wallX);
+
+        SDL_Surface* surf = nullptr;
+        if (wallId >= 0 && wallId < static_cast<int>(tm.textures.size())) {
+            surf = tm.textures[wallId];
+        }
+        int texW = surf ? surf->w : 1;
+        int texH = surf ? surf->h : 1;
+        int texX = static_cast<int>(wallX * texW);
+        if (!side && rayDirX > 0) {
+            texX = texW - texX - 1;
+        }
+        if (side && rayDirY < 0) {
+            texX = texW - texX - 1;
+        }
+
+        double texStep = static_cast<double>(texH) / lineHeight;
+        double texPos = (drawStart - cfg.screenHeight / 2 + lineHeight / 2) * texStep;
+
+        for (int y = drawStart; y <= drawEnd; ++y) {
+            if (y < 0 || y >= cfg.screenHeight) {
+                texPos += texStep;
+                continue;
+            }
+            int texY = static_cast<int>(texPos) & (texH - 1);
+            texPos += texStep;
+            Color c = surf ? sampleTexture(surf, texX, texY)
+                           : (hitDoor ? doorRenderColor(*hitDoor, side) : wallColor(wallId, side));
+            SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
+            SDL_RenderDrawPoint(renderer, x, y);
+        }
     }
 
     SDL_RenderPresent(renderer);
@@ -469,6 +560,7 @@ int main(int argc, char* argv[]) {
 
     Map map = createDemoMap();
     std::vector<Door> doors = extractDoors(map);
+    TextureManager textures = loadTextures();
     Player player{4.5, 4.5, -1.0, 0.0, 0.0, 0.66};
 
     bool running = true;
@@ -496,9 +588,10 @@ int main(int argc, char* argv[]) {
         handleInput(keystate, map, doors, player, cfg, dt);
         updateDoors(doors, player, dt);
 
-        renderFrame(map, doors, player, cfg, ctx.renderer);
+        renderFrame(map, doors, player, cfg, ctx.renderer, textures);
     }
 
+    freeTextures(textures);
     shutdownSDL(ctx);
     return 0;
 }

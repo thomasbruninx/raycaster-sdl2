@@ -1,8 +1,8 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++11 -O2
 PKG_CONFIG ?= pkg-config
-SDL2_CFLAGS := $(shell $(PKG_CONFIG) --cflags sdl2)
-SDL2_LIBS := $(shell $(PKG_CONFIG) --libs sdl2)
+SDL2_CFLAGS := $(shell $(PKG_CONFIG) --cflags sdl2 SDL2_image)
+SDL2_LIBS := $(shell $(PKG_CONFIG) --libs sdl2 SDL2_image)
 
 TARGET := raycaster
 SRC := main.cpp
