@@ -10,6 +10,12 @@ Requires SDL2, SDL2_image development headers and pkg-config.
 make all
 ```
 
+Clean up previous builds
+
+```bash
+make clean
+```
+
 ## Run
 
 ```bash
