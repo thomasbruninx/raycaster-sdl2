@@ -411,8 +411,20 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
 
         double hitX = player.x + perpWallDist * rayDirX;
         double hitY = player.y + perpWallDist * rayDirY;
-        double wallX = side ? hitX : hitY;
-        wallX -= std::floor(wallX);
+        double wallX;
+        if (hitDoor) {
+            if (hitDoor->vertical) {
+                double offsetY = hitDoor->y + hitDoor->openAmount;
+                wallX = hitY - offsetY;
+            } else {
+                double offsetX = hitDoor->x + hitDoor->openAmount;
+                wallX = hitX - offsetX;
+            }
+            wallX -= std::floor(wallX);
+        } else {
+            wallX = side ? hitX : hitY;
+            wallX -= std::floor(wallX);
+        }
 
         SDL_Surface* surf = nullptr;
         if (wallId >= 0 && wallId < static_cast<int>(tm.textures.size())) {
@@ -440,10 +452,10 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
             texPos += texStep;
             Color c = surf ? sampleTexture(surf, texX, texY)
                            : (hitDoor ? doorRenderColor(*hitDoor, side) : wallColor(wallId, side));
-            if(side == 1) {
-                c.r = c.r >> (Uint8)1 & 8355711;
-                c.g = c.g >> (Uint8)1 & 8355711;
-                c.b = c.b >> (Uint8)1 & 8355711;
+            if (side) {
+                c.r = static_cast<Uint8>(c.r * 0.7);
+                c.g = static_cast<Uint8>(c.g * 0.7);
+                c.b = static_cast<Uint8>(c.b * 0.7);
             }
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
             SDL_RenderDrawPoint(renderer, x, y);
