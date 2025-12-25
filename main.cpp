@@ -440,6 +440,11 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
             texPos += texStep;
             Color c = surf ? sampleTexture(surf, texX, texY)
                            : (hitDoor ? doorRenderColor(*hitDoor, side) : wallColor(wallId, side));
+            if(side == 1) {
+                c.r = c.r >> (Uint8)1 & 8355711;
+                c.g = c.g >> (Uint8)1 & 8355711;
+                c.b = c.b >> (Uint8)1 & 8355711;
+            }
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
             SDL_RenderDrawPoint(renderer, x, y);
         }
