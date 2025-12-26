@@ -168,6 +168,11 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
         if (side && rayDirY < 0) {
             texX = texW - texX - 1;
         }
+        // Mirror door texture when viewed from the back side.
+        bool mirrorDoor = hitDoor && (hitDoor->vertical ? (rayDirX > 0) : (rayDirY > 0));
+        if (mirrorDoor) {
+            texX = texW - texX - 1;
+        }
 
         double texStep = static_cast<double>(texH) / lineHeight;
         double texPos = (drawStart - cfg.screenHeight / 2 + lineHeight / 2) * texStep;
