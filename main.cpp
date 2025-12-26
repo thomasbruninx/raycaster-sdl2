@@ -33,11 +33,6 @@ int main(int argc, char* argv[]) {
                 running = false;
             } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                 running = false;
-            } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_SPACE) {
-                Door* target = doorInFront(player, map, doors);
-                if (target) {
-                    target->targetOpen = !target->targetOpen;
-                }
             }
         }
 

@@ -4,4 +4,4 @@
 
 #include "game_types.h"
 
-void handleInput(const Uint8* keystate, const Map& map, const std::vector<Door>& doors, Player& player, const Config& cfg, double dt);
+void handleInput(const Uint8* keystate, const Map& map, std::vector<Door>& doors, Player& player, const Config& cfg, double dt);

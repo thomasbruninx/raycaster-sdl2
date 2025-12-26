@@ -28,7 +28,7 @@ TextureManager loadTextures() {
     tm.textures[2] = loadSurface("resources/textures/greystone.png");
     tm.textures[3] = loadSurface("resources/textures/wood.png");
     tm.textures[4] = loadSurface("resources/textures/bluestone.png");
-    tm.textures[DOOR_TILE] = loadSurface("resources/textures/eagle.png");
+    tm.textures[DOOR_TILE] = loadSurface("resources/textures/door.png");
     return tm;
 }
 

@@ -49,6 +49,7 @@ struct Config {
     int screenWidth = 960;
     int screenHeight = 640;
     double moveSpeed = 3.0;      // units per second
+    double moveSpeedSprint = 5.0; // units per second when sprinting
     double rotSpeed = 1.8;       // radians per second
     double wallHeight = 1.0;
 };

@@ -20,10 +20,13 @@ bool isWalkable(double x, double y, const Map& map, const std::vector<Door>& doo
 }
 } // namespace
 
-void handleInput(const Uint8* keystate, const Map& map, const std::vector<Door>& doors, Player& player, const Config& cfg, double dt) {
+void handleInput(const Uint8* keystate, const Map& map, std::vector<Door>& doors, Player& player, const Config& cfg, double dt) {
     double moveStep = cfg.moveSpeed * dt;
     double rotStep = cfg.rotSpeed * dt;
 
+    if (keystate[SDL_SCANCODE_LSHIFT] || keystate[SDL_SCANCODE_RSHIFT]) {
+        moveStep = cfg.moveSpeedSprint * dt;
+    }
     if (keystate[SDL_SCANCODE_W] || keystate[SDL_SCANCODE_UP]) {
         double nextX = player.x + player.dirX * moveStep;
         double nextY = player.y + player.dirY * moveStep;
@@ -60,4 +63,13 @@ void handleInput(const Uint8* keystate, const Map& map, const std::vector<Door>&
         player.planeX = player.planeX * std::cos(-rotStep) - player.planeY * std::sin(-rotStep);
         player.planeY = oldPlaneX * std::sin(-rotStep) + player.planeY * std::cos(-rotStep);
     }
+    static bool wasSpaceDown = false;
+    bool isSpaceDown = keystate[SDL_SCANCODE_SPACE];
+    if (isSpaceDown && !wasSpaceDown) {
+        Door* target = doorInFront(player, map, doors);
+        if (target) {
+            target->targetOpen = !target->targetOpen;
+        }
+    }
+    wasSpaceDown = isSpaceDown;
 }
