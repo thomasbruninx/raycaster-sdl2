@@ -7,6 +7,7 @@
 #include "renderer.h"
 #include "sdl_context.h"
 #include "textures.h"
+#include "console.h"
 
 int main(int argc, char* argv[]) {
     (void)argc;
@@ -23,6 +24,7 @@ int main(int argc, char* argv[]) {
     std::vector<Door> doors = extractDoors(map);
     TextureManager textures = loadTextures();
     Player player{4.5, 4.5, -1.0, 0.0, 0.0, 0.66};
+    ConsoleState console{};
 
     bool running = true;
     Uint32 lastTicks = SDL_GetTicks();
@@ -31,9 +33,14 @@ int main(int argc, char* argv[]) {
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) {
                 running = false;
-            } else if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
-                running = false;
+            } else if (e.type == SDL_KEYDOWN) {
+                if (e.key.keysym.sym == SDLK_ESCAPE) {
+                    running = false;
+                } else if (e.key.repeat == 0 && e.key.keysym.sym == SDLK_TAB) {
+                    setConsoleOpen(console, !console.open);
+                }
             }
+            handleConsoleEvent(console, e, cfg, player, running);
         }
 
         Uint32 currentTicks = SDL_GetTicks();
@@ -41,12 +48,15 @@ int main(int argc, char* argv[]) {
         lastTicks = currentTicks;
 
         const Uint8* keystate = SDL_GetKeyboardState(nullptr);
-        handleInput(keystate, map, doors, player, cfg, dt);
+        if (!console.open) {
+            handleInput(keystate, map, doors, player, cfg, dt);
+        }
         updateDoors(doors, player, dt);
 
-        renderFrame(map, doors, player, cfg, ctx.renderer, textures);
+        renderFrame(map, doors, player, cfg, ctx.renderer, textures, console);
     }
 
+    setConsoleOpen(console, false);
     freeTextures(textures);
     shutdownSDL(ctx);
     return 0;
