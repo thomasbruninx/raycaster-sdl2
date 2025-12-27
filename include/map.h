@@ -1,5 +1,7 @@
 #pragma once
 
 #include "game_types.h"
+#include <utility>
 
-Map createDemoMap();
+Map createRandomMap();
+std::pair<double, double> pickSpawnPoint(const Map& map);

@@ -20,10 +20,11 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    Map map = createDemoMap();
+    Map map = createRandomMap();
     std::vector<Door> doors = extractDoors(map);
     TextureManager textures = loadTextures();
-    Player player{4.5, 4.5, -1.0, 0.0, 0.0, 0.66};
+    auto spawn = pickSpawnPoint(map);
+    Player player{spawn.first, spawn.second, -1.0, 0.0, 0.0, 0.66};
     ConsoleState console{};
 
     bool running = true;
