@@ -230,14 +230,15 @@ void drawConsoleOverlay(const Config& cfg, SDL_Renderer* renderer, const Console
     SDL_RenderFillRect(renderer, &cursor);
 }
 
-void drawMinimap(const Map& map, const Player& player, const Config& cfg, SDL_Renderer* renderer, int size, int margin) {
-    int x0 = cfg.screenWidth - size - margin;
+void drawMinimap(const Map& map, const Player& player, SDL_Renderer* renderer, int size, int margin) {
+    int x0 = margin;
     int y0 = margin;
     SDL_Rect bg{x0, y0, size, size};
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
     SDL_RenderFillRect(renderer, &bg);
     SDL_SetRenderDrawColor(renderer, 70, 70, 70, 200);
     SDL_RenderDrawRect(renderer, &bg);
+    SDL_RenderSetClipRect(renderer, &bg);
 
     double angle = std::atan2(player.dirY, player.dirX);
     const double halfPi = 1.5707963267948966;
@@ -253,6 +254,7 @@ void drawMinimap(const Map& map, const Player& player, const Config& cfg, SDL_Re
         double dy = wy - player.y;
         double rx = dx * cosA - dy * sinA;
         double ry = dx * sinA + dy * cosA;
+        rx = -rx; // mirror projection horizontally
         outX = static_cast<int>(cx + rx * scale);
         outY = static_cast<int>(cy + ry * scale);
     };
@@ -284,6 +286,8 @@ void drawMinimap(const Map& map, const Player& player, const Config& cfg, SDL_Re
     SDL_SetRenderDrawColor(renderer, 60, 220, 110, 255);
     SDL_Rect playerDot{px - 2, py - 2, 4, 4};
     SDL_RenderFillRect(renderer, &playerDot);
+
+    SDL_RenderSetClipRect(renderer, nullptr);
 }
 } // namespace
 
@@ -443,7 +447,7 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
     }
 
     if (showMinimap) {
-        drawMinimap(map, player, cfg, renderer, 64, 8);
+        drawMinimap(map, player, renderer, 256, 8);
     }
 
     if (console.open) {
