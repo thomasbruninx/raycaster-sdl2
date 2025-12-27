@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
     auto spawn = pickSpawnPoint(map);
     Player player{spawn.first, spawn.second, -1.0, 0.0, 0.0, 0.66};
     ConsoleState console{};
+    bool minimapVisible = true;
 
     bool running = true;
     Uint32 lastTicks = SDL_GetTicks();
@@ -39,6 +40,8 @@ int main(int argc, char* argv[]) {
                     running = false;
                 } else if (e.key.repeat == 0 && e.key.keysym.sym == SDLK_TAB) {
                     setConsoleOpen(console, !console.open);
+                } else if (e.key.repeat == 0 && e.key.keysym.sym == SDLK_m) {
+                    minimapVisible = !minimapVisible;
                 }
             }
             handleConsoleEvent(console, e, cfg, player, running);
@@ -54,7 +57,7 @@ int main(int argc, char* argv[]) {
         }
         updateDoors(doors, player, dt);
 
-        renderFrame(map, doors, player, cfg, ctx.renderer, textures, console);
+        renderFrame(map, doors, player, cfg, ctx.renderer, textures, console, minimapVisible);
     }
 
     setConsoleOpen(console, false);

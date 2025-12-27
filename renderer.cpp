@@ -229,9 +229,65 @@ void drawConsoleOverlay(const Config& cfg, SDL_Renderer* renderer, const Console
     SDL_Rect cursor{cursorX, inputY, scale * 2, 8 * scale};
     SDL_RenderFillRect(renderer, &cursor);
 }
+
+void drawMinimap(const Map& map, const Player& player, const Config& cfg, SDL_Renderer* renderer, int size, int margin) {
+    int x0 = cfg.screenWidth - size - margin;
+    int y0 = margin;
+    SDL_Rect bg{x0, y0, size, size};
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 160);
+    SDL_RenderFillRect(renderer, &bg);
+    SDL_SetRenderDrawColor(renderer, 70, 70, 70, 200);
+    SDL_RenderDrawRect(renderer, &bg);
+
+    double angle = std::atan2(player.dirY, player.dirX);
+    const double halfPi = 1.5707963267948966;
+    double rot = -angle - halfPi; // Player faces "up" on the minimap.
+    double cosA = std::cos(rot);
+    double sinA = std::sin(rot);
+    double scale = 6.0;
+    double cx = x0 + size / 2.0;
+    double cy = y0 + size / 2.0;
+
+    auto worldToMini = [&](double wx, double wy, int& outX, int& outY) {
+        double dx = wx - player.x;
+        double dy = wy - player.y;
+        double rx = dx * cosA - dy * sinA;
+        double ry = dx * sinA + dy * cosA;
+        outX = static_cast<int>(cx + rx * scale);
+        outY = static_cast<int>(cy + ry * scale);
+    };
+
+    auto drawTile = [&](int cellX, int cellY, SDL_Color color) {
+        int tlx, tly, trx, try_, brx, bry, blx, bly;
+        worldToMini(cellX, cellY, tlx, tly);
+        worldToMini(cellX + 1, cellY, trx, try_);
+        worldToMini(cellX + 1, cellY + 1, brx, bry);
+        worldToMini(cellX, cellY + 1, blx, bly);
+        SDL_SetRenderDrawColor(renderer, color.r, color.g, color.b, 255);
+        SDL_RenderDrawLine(renderer, tlx, tly, trx, try_);
+        SDL_RenderDrawLine(renderer, trx, try_, brx, bry);
+        SDL_RenderDrawLine(renderer, brx, bry, blx, bly);
+        SDL_RenderDrawLine(renderer, blx, bly, tlx, tly);
+    };
+
+    for (int y = 0; y < map.height; ++y) {
+        for (int x = 0; x < map.width; ++x) {
+            int tile = map.tiles[y * map.width + x];
+            if (tile == 0) continue;
+            SDL_Color color = (tile == DOOR_TILE) ? SDL_Color{230, 200, 40, 255} : SDL_Color{240, 240, 240, 255};
+            drawTile(x, y, color);
+        }
+    }
+
+    int px, py;
+    worldToMini(player.x, player.y, px, py);
+    SDL_SetRenderDrawColor(renderer, 60, 220, 110, 255);
+    SDL_Rect playerDot{px - 2, py - 2, 4, 4};
+    SDL_RenderFillRect(renderer, &playerDot);
+}
 } // namespace
 
-void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm, const ConsoleState& console) {
+void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm, const ConsoleState& console, bool showMinimap) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
@@ -384,6 +440,10 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
             SDL_RenderDrawPoint(renderer, x, y);
         }
+    }
+
+    if (showMinimap) {
+        drawMinimap(map, player, cfg, renderer, 64, 8);
     }
 
     if (console.open) {
