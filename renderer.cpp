@@ -208,7 +208,7 @@ void drawConsoleOverlay(const Config& cfg, SDL_Renderer* renderer, const Console
     SDL_RenderDrawRect(renderer, &bg);
 
     int padding = 8;
-    int scale = 2;
+    int scale = 1;
     int lineHeight = 8 * scale + 4;
     int inputY = cfg.screenHeight - padding - lineHeight;
     int logAreaHeight = inputY - (cfg.screenHeight - consoleHeight + padding);
@@ -456,7 +456,7 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
         oss.precision(1);
         oss << std::fixed << fps << " fps";
         std::string text = oss.str();
-        int scale = 2;
+        int scale = 1;
         int charWidth = 8 * scale + scale;
         int textWidth = static_cast<int>(text.size()) * charWidth;
         int x = cfg.screenWidth - textWidth - 8;
