@@ -22,6 +22,6 @@ make clean
 ./raycaster
 ```
 
-Controls: `W/S` or `Up/Down` to move, `A/D` or arrow keys to turn, `Space` for action, hold `Shift` while moving to run, `Esc` to exit.
+Controls: `W/S` or `Up/Down` to move, `A/D` or arrow keys to turn, `Space` for action, hold `Shift` while moving to run, `M` to toggle the minimap, `TAB` to open the console, `Esc` to exit.
 
 Textures are loaded from `resources/textures/*.png` (redbrick, greystone, wood, bluestone, door).

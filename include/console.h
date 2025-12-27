@@ -8,6 +8,7 @@
 
 struct ConsoleState {
     bool open = false;
+    bool showFPS = false;
     std::string input;
     std::vector<std::string> history;
     int historyIndex = -1; // -1 means editing current input

@@ -4,6 +4,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <sstream>
 #include <string>
 
 #include "doors.h"
@@ -291,7 +292,7 @@ void drawMinimap(const Map& map, const Player& player, SDL_Renderer* renderer, i
 }
 } // namespace
 
-void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm, const ConsoleState& console, bool showMinimap) {
+void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm, const ConsoleState& console, bool showMinimap, double fps) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
@@ -447,7 +448,20 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
     }
 
     if (showMinimap) {
-        drawMinimap(map, player, renderer, 256, 8);
+        drawMinimap(map, player, renderer, 250, 8);
+    }
+
+    if (console.showFPS) {
+        std::ostringstream oss;
+        oss.precision(1);
+        oss << std::fixed << fps << " fps";
+        std::string text = oss.str();
+        int scale = 2;
+        int charWidth = 8 * scale + scale;
+        int textWidth = static_cast<int>(text.size()) * charWidth;
+        int x = cfg.screenWidth - textWidth - 8;
+        int y = 8;
+        drawText(renderer, x, y, text, scale, {240, 240, 240});
     }
 
     if (console.open) {

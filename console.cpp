@@ -50,6 +50,7 @@ void printHelp(ConsoleState& console) {
     addLogLine(console, "  set_speed <v>      - Set walk speed");
     addLogLine(console, "  set_sprint <v>     - Set sprint speed");
     addLogLine(console, "  wall_height <v>    - Set wall height scale");
+    addLogLine(console, "  show_fps           - Toggle FPS counter");
     addLogLine(console, "  quit/exit          - Quit the game");
 }
 
@@ -117,6 +118,9 @@ void handleCommand(ConsoleState& console, const std::string& rawCmd, Config& cfg
         } else {
             addLogLine(console, "Invalid wall height value");
         }
+    } else if (name == "show_fps") {
+        console.showFPS = !console.showFPS;
+        addLogLine(console, std::string("FPS display ") + (console.showFPS ? "enabled" : "disabled"));
     } else if (name == "quit" || name == "exit") {
         running = false;
     } else {

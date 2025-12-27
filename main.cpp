@@ -27,6 +27,7 @@ int main(int argc, char* argv[]) {
     Player player{spawn.first, spawn.second, -1.0, 0.0, 0.0, 0.66};
     ConsoleState console{};
     bool minimapVisible = true;
+    double fps = 0.0;
 
     bool running = true;
     Uint32 lastTicks = SDL_GetTicks();
@@ -50,6 +51,8 @@ int main(int argc, char* argv[]) {
         Uint32 currentTicks = SDL_GetTicks();
         double dt = (currentTicks - lastTicks) / 1000.0;
         lastTicks = currentTicks;
+        double instFps = (dt > 0.0) ? (1.0 / dt) : fps;
+        fps = fps * 0.9 + instFps * 0.1;
 
         const Uint8* keystate = SDL_GetKeyboardState(nullptr);
         if (!console.open) {
@@ -57,7 +60,7 @@ int main(int argc, char* argv[]) {
         }
         updateDoors(doors, player, dt);
 
-        renderFrame(map, doors, player, cfg, ctx.renderer, textures, console, minimapVisible);
+        renderFrame(map, doors, player, cfg, ctx.renderer, textures, console, minimapVisible, fps);
     }
 
     setConsoleOpen(console, false);
