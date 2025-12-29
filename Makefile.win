@@ -1,0 +1,49 @@
+# Project: raycaster-sdl2
+# Makefile created by Embarcadero Dev-C++ 6.3
+
+CPP      = g++.exe
+CC       = gcc.exe
+WINDRES  = windres.exe
+OBJ      = obj/console.o obj/doors.o obj/input.o obj/main.o obj/map.o obj/renderer.o obj/sdl_context.o obj/textures.o
+LINKOBJ  = obj/console.o obj/doors.o obj/input.o obj/main.o obj/map.o obj/renderer.o obj/sdl_context.o obj/textures.o
+LIBS     = -L"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/x86_64-w64-mingw32/lib32" -static-libgcc -L"C:/libs/SDL2-devel-2.32.10-mingw/i686-w64-mingw32/lib" -L"C:/libs/SDL2-devel-2.32.10-mingw/i686-w64-mingw32/bin" -mwindows -lmingw32  -lSDL2main  -lSDL2 -lSDL2_image -m32
+INCS     = -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/include" -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/x86_64-w64-mingw32/include" -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/lib/gcc/x86_64-w64-mingw32/9.2.0/include" -I"C:/libs/SDL2-devel-2.32.10-mingw/i686-w64-mingw32/include/SDL2" -I"C:/libs/SDL2-devel-2.32.10-mingw/i686-w64-mingw32/include" -I"include"
+CXXINCS  = -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/include" -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/x86_64-w64-mingw32/include" -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/lib/gcc/x86_64-w64-mingw32/9.2.0/include" -I"C:/Program Files (x86)/Embarcadero/Dev-Cpp/TDM-GCC-64/lib/gcc/x86_64-w64-mingw32/9.2.0/include/c++" -I"C:/libs/SDL2-devel-2.32.10-mingw/i686-w64-mingw32/include/SDL2" -I"C:/libs/SDL2-devel-2.32.10-mingw/i686-w64-mingw32/include" -I"include"
+BIN      = bin/raycaster-sdl2.exe
+CXXFLAGS = $(CXXINCS) -m32
+CFLAGS   = $(INCS) -m32
+DEL      = C:\Program Files (x86)\Embarcadero\Dev-Cpp\devcpp.exe INTERNAL_DEL
+
+.PHONY: all all-before all-after clean clean-custom
+
+all: all-before $(BIN) all-after
+
+clean: clean-custom
+	${DEL} $(OBJ) $(BIN)
+
+$(BIN): $(OBJ)
+	$(CPP) $(LINKOBJ) -o $(BIN) $(LIBS)
+
+obj/console.o: console.cpp
+	$(CPP) -c console.cpp -o obj/console.o $(CXXFLAGS)
+
+obj/doors.o: doors.cpp
+	$(CPP) -c doors.cpp -o obj/doors.o $(CXXFLAGS)
+
+obj/input.o: input.cpp
+	$(CPP) -c input.cpp -o obj/input.o $(CXXFLAGS)
+
+obj/main.o: main.cpp
+	$(CPP) -c main.cpp -o obj/main.o $(CXXFLAGS)
+
+obj/map.o: map.cpp
+	$(CPP) -c map.cpp -o obj/map.o $(CXXFLAGS)
+
+obj/renderer.o: renderer.cpp
+	$(CPP) -c renderer.cpp -o obj/renderer.o $(CXXFLAGS)
+
+obj/sdl_context.o: sdl_context.cpp
+	$(CPP) -c sdl_context.cpp -o obj/sdl_context.o $(CXXFLAGS)
+
+obj/textures.o: textures.cpp
+	$(CPP) -c textures.cpp -o obj/textures.o $(CXXFLAGS)

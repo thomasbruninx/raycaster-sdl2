@@ -2,3 +2,4 @@ raycaster
 .DS_Store
 resources/
 obj/
+bin/
