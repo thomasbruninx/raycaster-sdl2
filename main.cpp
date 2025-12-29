@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
                 } else if (e.key.repeat == 0 && e.key.keysym.sym == SDLK_TAB) {
                     setConsoleOpen(console, !console.open);
                 } else if (e.key.repeat == 0 && e.key.keysym.sym == SDLK_m) {
-                    minimapVisible = !minimapVisible;
+                    if (!console.open) minimapVisible = !minimapVisible;
                 }
             }
             handleConsoleEvent(console, e, cfg, player, running);
