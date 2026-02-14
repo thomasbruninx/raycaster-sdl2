@@ -178,3 +178,35 @@ std::pair<double, double> pickSpawnPoint(const Map& map) {
     }
     return {1.5, 1.5};
 }
+
+std::vector<Sprite> createSprites(const Map& map) {
+    std::vector<std::pair<int, int>> candidates;
+    candidates.reserve((map.width - 2) * (map.height - 2));
+    for (int y = 1; y < map.height - 1; ++y) {
+        for (int x = 1; x < map.width - 1; ++x) {
+            if (map.at(x, y) == 0) {
+                candidates.push_back({x, y});
+            }
+        }
+    }
+    if (candidates.empty()) {
+        return {};
+    }
+
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    std::shuffle(candidates.begin(), candidates.end(), rng);
+
+    int targetCount = std::clamp((map.width * map.height) / 180, 12, 96);
+    int spriteCount = std::min(targetCount, static_cast<int>(candidates.size()));
+    std::uniform_int_distribution<int> spriteTexDist(0, 2);
+
+    std::vector<Sprite> sprites;
+    sprites.reserve(spriteCount);
+    for (int i = 0; i < spriteCount; ++i) {
+        int x = candidates[i].first;
+        int y = candidates[i].second;
+        sprites.push_back({x + 0.5, y + 0.5, spriteTexDist(rng)});
+    }
+    return sprites;
+}

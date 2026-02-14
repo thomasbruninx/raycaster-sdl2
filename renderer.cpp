@@ -175,6 +175,11 @@ Color doorRenderColor(const Door& door, bool isSideHit) {
     return base;
 }
 
+bool isSpritePixelTransparent(Uint8 r, Uint8 g, Uint8 b, Uint8 a) {
+    // Support both alpha-transparent sprites and Lodev's "black is transparent" convention.
+    return a == 0 || (r == 0 && g == 0 && b == 0);
+}
+
 void drawChar(SDL_Renderer* renderer, int x, int y, char ch, int scale, Color color) {
     unsigned char idx = static_cast<unsigned char>(ch);
     const uint8_t* bitmap = FONT[idx];
@@ -292,7 +297,7 @@ void drawMinimap(const Map& map, const Player& player, SDL_Renderer* renderer, i
 }
 } // namespace
 
-void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm, const ConsoleState& console, bool showMinimap, double fps) {
+void renderFrame(const Map& map, const std::vector<Door>& doors, const std::vector<Sprite>& sprites, const Player& player, const Config& cfg, SDL_Renderer* renderer, const TextureManager& tm, const ConsoleState& console, bool showMinimap, double fps) {
     SDL_SetRenderDrawColor(renderer, 30, 30, 30, 255);
     SDL_RenderClear(renderer);
 
@@ -306,6 +311,8 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
         SDL_SetRenderDrawColor(renderer, shade, shade, shade, 255);
         SDL_RenderDrawLine(renderer, 0, y, cfg.screenWidth, y);
     }
+
+    std::vector<double> zBuffer(cfg.screenWidth, 0.0);
 
     for (int x = 0; x < cfg.screenWidth; ++x) {
         double cameraX = 2.0 * x / cfg.screenWidth - 1.0;
@@ -444,6 +451,78 @@ void renderFrame(const Map& map, const std::vector<Door>& doors, const Player& p
             }
             SDL_SetRenderDrawColor(renderer, c.r, c.g, c.b, 255);
             SDL_RenderDrawPoint(renderer, x, y);
+        }
+        zBuffer[x] = perpWallDist;
+    }
+
+    std::vector<int> spriteOrder(sprites.size());
+    std::vector<double> spriteDistance(sprites.size(), 0.0);
+    for (size_t i = 0; i < sprites.size(); ++i) {
+        spriteOrder[i] = static_cast<int>(i);
+        double dx = player.x - sprites[i].x;
+        double dy = player.y - sprites[i].y;
+        spriteDistance[i] = dx * dx + dy * dy;
+    }
+    std::sort(spriteOrder.begin(), spriteOrder.end(), [&](int a, int b) {
+        return spriteDistance[a] > spriteDistance[b];
+    });
+
+    for (int i : spriteOrder) {
+        const Sprite& sprite = sprites[i];
+        if (sprite.textureId < 0 || sprite.textureId >= static_cast<int>(tm.spriteTextures.size())) {
+            continue;
+        }
+        SDL_Surface* spriteSurf = tm.spriteTextures[sprite.textureId];
+        if (!spriteSurf) {
+            continue;
+        }
+
+        double spriteX = sprite.x - player.x;
+        double spriteY = sprite.y - player.y;
+
+        double invDet = 1.0 / (player.planeX * player.dirY - player.dirX * player.planeY);
+        double transformX = invDet * (player.dirY * spriteX - player.dirX * spriteY);
+        double transformY = invDet * (-player.planeY * spriteX + player.planeX * spriteY);
+        if (transformY <= 0.0001) {
+            continue;
+        }
+
+        int spriteScreenX = static_cast<int>((cfg.screenWidth / 2.0) * (1.0 + transformX / transformY));
+        int spriteHeight = std::abs(static_cast<int>(cfg.screenHeight / transformY));
+        if (spriteHeight <= 0) {
+            continue;
+        }
+        int drawStartY = std::max(-spriteHeight / 2 + cfg.screenHeight / 2, 0);
+        int drawEndY = std::min(spriteHeight / 2 + cfg.screenHeight / 2, cfg.screenHeight - 1);
+
+        int spriteWidth = std::abs(static_cast<int>(cfg.screenHeight / transformY));
+        if (spriteWidth <= 0) {
+            continue;
+        }
+        int drawStartX = std::max(-spriteWidth / 2 + spriteScreenX, 0);
+        int drawEndX = std::min(spriteWidth / 2 + spriteScreenX, cfg.screenWidth - 1);
+
+        for (int stripe = drawStartX; stripe <= drawEndX; ++stripe) {
+            int texX = static_cast<int>((stripe - (-spriteWidth / 2 + spriteScreenX)) * spriteSurf->w / static_cast<double>(spriteWidth));
+            if (stripe < 0 || stripe >= cfg.screenWidth) {
+                continue;
+            }
+            if (transformY >= zBuffer[stripe]) {
+                continue;
+            }
+
+            for (int y = drawStartY; y <= drawEndY; ++y) {
+                int d = (y * 256) - (cfg.screenHeight * 128) + (spriteHeight * 128);
+                int texY = ((d * spriteSurf->h) / spriteHeight) / 256;
+                Uint32 pixel = sampleTextureRaw(spriteSurf, texX, texY);
+                Uint8 r, g, b, a;
+                SDL_GetRGBA(pixel, spriteSurf->format, &r, &g, &b, &a);
+                if (isSpritePixelTransparent(r, g, b, a)) {
+                    continue;
+                }
+                SDL_SetRenderDrawColor(renderer, r, g, b, 255);
+                SDL_RenderDrawPoint(renderer, stripe, y);
+            }
         }
     }
 

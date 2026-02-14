@@ -5,3 +5,4 @@
 TextureManager loadTextures();
 void freeTextures(TextureManager& tm);
 Color sampleTexture(SDL_Surface* surf, int x, int y);
+Uint32 sampleTextureRaw(SDL_Surface* surf, int x, int y);

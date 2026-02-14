@@ -29,6 +29,9 @@ TextureManager loadTextures() {
     tm.textures[3] = loadSurface("resources/textures/wood.png");
     tm.textures[4] = loadSurface("resources/textures/bluestone.png");
     tm.textures[DOOR_TILE] = loadSurface("resources/textures/door.png");
+    tm.spriteTextures.push_back(loadSurface("resources/textures/sprite_barrel.png"));
+    tm.spriteTextures.push_back(loadSurface("resources/textures/sprite_pillar.png"));
+    tm.spriteTextures.push_back(loadSurface("resources/textures/sprite_greenlight.png"));
     return tm;
 }
 
@@ -38,18 +41,32 @@ void freeTextures(TextureManager& tm) {
             SDL_FreeSurface(surf);
         }
     }
+    for (auto* surf : tm.spriteTextures) {
+        if (surf) {
+            SDL_FreeSurface(surf);
+        }
+    }
     tm.textures.clear();
+    tm.spriteTextures.clear();
+}
+
+Uint32 sampleTextureRaw(SDL_Surface* surf, int x, int y) {
+    if (!surf) {
+        return 0;
+    }
+    x = std::max(0, std::min(x, surf->w - 1));
+    y = std::max(0, std::min(y, surf->h - 1));
+    Uint8* pixelBase = static_cast<Uint8*>(surf->pixels);
+    Uint32* pixels = reinterpret_cast<Uint32*>(pixelBase);
+    int stride = surf->pitch / static_cast<int>(sizeof(Uint32));
+    return pixels[y * stride + x];
 }
 
 Color sampleTexture(SDL_Surface* surf, int x, int y) {
     if (!surf) {
         return {255, 0, 255}; // magenta fallback
     }
-    x = std::max(0, std::min(x, surf->w - 1));
-    y = std::max(0, std::min(y, surf->h - 1));
-    Uint8* pixelBase = static_cast<Uint8*>(surf->pixels);
-    Uint32* pixels = reinterpret_cast<Uint32*>(pixelBase);
-    Uint32 pixel = pixels[y * surf->w + x];
+    Uint32 pixel = sampleTextureRaw(surf, x, y);
     Uint8 r, g, b, a;
     SDL_GetRGBA(pixel, surf->format, &r, &g, &b, &a);
     return {r, g, b};

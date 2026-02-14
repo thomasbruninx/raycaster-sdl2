@@ -36,6 +36,12 @@ struct Door {
         : x(x_), y(y_), vertical(vertical_) {}
 };
 
+struct Sprite {
+    double x;
+    double y;
+    int textureId; // index into TextureManager::spriteTextures
+};
+
 struct Player {
     double x;
     double y;
@@ -60,5 +66,6 @@ struct SDLContext {
 };
 
 struct TextureManager {
-    std::vector<SDL_Surface*> textures; // index by tile id
+    std::vector<SDL_Surface*> textures;       // index by tile id
+    std::vector<SDL_Surface*> spriteTextures; // index by Sprite::textureId
 };
